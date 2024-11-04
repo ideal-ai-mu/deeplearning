@@ -13,7 +13,7 @@ import numpy as np
 
 # 超参数
 device = "cuda" if torch.cuda.is_available() else "cpu"
-lr = 3e-4
+lr = 1e-4
 z_dim = 64
 image_dim = 28 * 28 * 1
 batch = 32
@@ -39,6 +39,7 @@ def train(num_epochs):
         for batch_idx, (real, _) in tqdm(enumerate(loader)):
             real = real.view(-1, 784).to(device)
             batch_size = real.shape[0]
+
             ## D: 目标：真的判断为真，假的判断为假
             ## 训练Discriminator: max log(D(x)) + log(1-D(G(z)))
             disc_real = Disc(real)#.view(-1)  # 将真实图片放入到判别器中
@@ -46,7 +47,7 @@ def train(num_epochs):
 
             noise = torch.randn(batch_size, z_dim).to(device)
             fake = Gen(noise)  # 将随机噪声放入到生成器中
-            disc_fake = Disc(fake).view(-1)  # 判别器判断真假
+            disc_fake = Disc(fake.detach()).view(-1)  # 判别器判断真假,计算图分离，只训练D
             lossD_fake = criterion(disc_fake, torch.zeros_like(disc_fake))  # 假的应该判断为假
             lossD = (lossD_real + lossD_fake) / 2  # loss包括判真损失和判假损失
 
@@ -56,7 +57,7 @@ def train(num_epochs):
 
             # G： 目标：生成的越真越好
             ## 训练生成器： min log(1-D(G(z))) <-> max log(D(G(z)))
-            output = Disc(fake).view(-1)   # 生成的放入识别器
+            output = Disc(fake).view(-1)   # 生成的放入判别器
             lossG = criterion(output, torch.ones_like(output))  # 与“真的”的距离，越小越好
             Gen.zero_grad()
             lossG.backward()
@@ -67,7 +68,7 @@ def train(num_epochs):
 
                 print(
                     f"Epoch [{epoch}/{num_epochs}] Batch {batch_idx}/{len(loader)}' \
-                        loss D: {lossD:.4f}, loss G: {lossG:.4f}"
+                        loss D: {lossD.item():.4f}, loss G: {lossG.item():.4f}"
                 )
 
                 # 推理生成结果

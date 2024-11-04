@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-LEARNING_RATE = 2e-4
+LEARNING_RATE = 1e-4
 BATCH_SIZE = 128
 IMAGE_SIZE = 64
 NUM_EPOCHS = 5
@@ -72,32 +72,40 @@ def train(NUM_EPOCHS):
             loss_disc.backward()
             opt_disc.step()
 
-            # Train Generator: min log(1 - D(G(z))) <-> max log(D(G(z)), 先训练一个epoch 的D
-            if epoch >= 0:
-                output = disc(fake).reshape(-1)
-                loss_gen = criterion(output, torch.ones_like(output))
+            # Train Generator: min log(1 - D(G(z))) <-> max log(D(G(z)),
+            output = disc(fake).reshape(-1)
+            loss_gen = criterion(output, torch.ones_like(output))
 
-                gen.zero_grad()
-                loss_gen.backward()
-                opt_gen.step()
+            gen.zero_grad()
+            loss_gen.backward()
+            opt_gen.step()
 
-                if batch_id % 20 == 0:
-                    print(
-                        f'Epoch [{epoch}/{NUM_EPOCHS}] Batch {batch_id}/{len(dataloader)} Loss D: {loss_disc}, loss G: {loss_gen}')
+            if batch_id % 20 == 0:
+                print(
+                    f'Epoch [{epoch}/{NUM_EPOCHS}] Batch {batch_id}/{len(dataloader)} Loss D: {loss_disc.item()}, loss G: {loss_gen.item()}')
 
-                    # 推理生成结果
-                    with torch.no_grad():
-                        fake = gen(fixed_noise)
-                        img_grid_real = torchvision.utils.make_grid(real[:32], normalize=True)
-                        img_grid_fake = torchvision.utils.make_grid(fake[:32], normalize=True)
+                # 推理生成结果
+                with torch.no_grad():
+                    fake = gen(fixed_noise)
+                    img_grid_real = torchvision.utils.make_grid(real[:32], normalize=True)
+                    img_grid_fake = torchvision.utils.make_grid(fake[:32], normalize=True)
 
-                        img_grid_combined = torch.cat((img_grid_real, img_grid_fake), dim=2)
-                        img_grid_combined = img_grid_combined.permute(1, 2, 0).cpu().detach().numpy()
-                        img_grid_combined = (img_grid_combined * 255).astype(np.uint8)
-                        # 使用 cv2 显示图片
-                        cv2.imshow('Combined Image', img_grid_combined)
-                        cv2.waitKey(1)
-                        cv2.imwrite(f"ckpt/tmp_dc.jpg", img_grid_combined)
+                    img_grid_combined = torch.cat((img_grid_real, img_grid_fake), dim=2)
+                    img_grid_combined = img_grid_combined.permute(1, 2, 0).cpu().detach().numpy()
+                    img_grid_combined = (img_grid_combined * 255).astype(np.uint8)
+                    # 使用 cv2 显示图片
+                    cv2.imshow('Combined Image', img_grid_combined)
+                    cv2.waitKey(1)
+                    cv2.imwrite(f"ckpt/tmp_dc.jpg", img_grid_combined)
+
+                # 防止生成器崩溃,重新初始话模型
+                if loss_gen.item() > 5:
+                    gen = Generator(NOISE_DIM, CHANNELS_IMG, FEATURES_GEN).to(device)
+                    disc = Discriminator(CHANNELS_IMG, FEATURES_DISC).to(device)
+                    initialize_weights(gen)
+                    initialize_weights(disc)
+                    opt_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
+                    opt_disc = optim.Adam(disc.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
 
         if (epoch + 1) % 10 == 0:
             torch.save(gen.state_dict(), f"ckpt/dc_gen_weights.pth")
