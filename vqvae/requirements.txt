@@ -1,0 +1,3 @@
+torchinfo
+opencv-python
+tqdm
