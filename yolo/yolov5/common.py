@@ -54,7 +54,6 @@ class Conv(nn.Module):
 
 
 # 2. C3, bottleneck
-
 class Bottleneck(nn.Module):
     # Standard bottleneck
     def __init__(self, c1, c2, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, shortcut, groups, expansion

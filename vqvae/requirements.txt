@@ -1,3 +1,5 @@
 torchinfo
 opencv-python
 tqdm
+einops
+numpy
